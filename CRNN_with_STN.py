@@ -2,7 +2,6 @@ import linecache
 import string
 import cv2
 import numpy as np
-# import tensorflow as tf
 from keras import backend as bknd
 from keras.callbacks import *
 from keras.layers import *
@@ -39,17 +38,6 @@ file_list_len = len(file_list_full)
 # load validation data
 file_list_val_full = file_list_val.readlines()
 file_list_val_len = len(file_list_val_full)
-# img_path_val = []
-# lexicon_val = []
-# for i in range(file_list_val_len):
-#     file_list_full_val_split = [m for m in file_list_full[i].split()]
-#     img_path_val.append('/media/junbo/新加卷/OCR Datasets/max/90kDICT32px'+file_list_full_val_split[0][1:])
-#     lexicon = linecache.getline(lexicon_dic_path, int(file_list_full_val_split[1])+1).strip("\n")
-#     while len(lexicon) < label_len:
-#         lexicon += "-"
-#     lexicon_val.append(lexicon)
-# file_list_val_full = []
-
 
 # functions
 class Evaluate(Callback):
@@ -93,7 +81,7 @@ def ctc_lambda_func(args):
     iy_pred, ilabels, iinput_length, ilabel_length = args
     # the 2 is critical here since the first couple outputs of the RNN
     # tend to be garbage:
-    iy_pred = iy_pred[:, 2:, :]  # 测试感觉没影响
+    iy_pred = iy_pred[:, 2:, :] 
     return bknd.ctc_batch_cost(ilabels, iy_pred, iinput_length, ilabel_length)
 
 
@@ -267,17 +255,10 @@ model = Model(inputs=[inputShape, labels, input_length, label_length], outputs=[
 
 # clipnorm seems to speeds up convergence
 sgd = SGD(lr=learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
-adam = optimizers.Adam()
-
 model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=sgd)
-# model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
-# model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer='adadelta')
-
 
 model.summary()  # print a summary representation of your model.
 # plot_model(model, to_file='7layers_CNN.png', show_shapes=True)
-
-# remember to adjust the parameter to the steps_per_epoch=600, epochs=100
 
 model_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best.{epoch:02d}-{loss:.2f}.hdf5'
 checkpoint = ModelCheckpoint(model_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
@@ -287,11 +268,7 @@ model.fit_generator(img_gen(), steps_per_epoch=10000, epochs=20, verbose=1,
                     callbacks=[evaluator, checkpoint,
                                TensorBoard(log_dir='/home/junbo/PycharmProjects/test0_mnist/CRC_n/paper_log')])
 
-# model.fit(x=, y=, batch_size=50, epochs=200, steps_per_epoch= 1000, verbose=1, validation_data=,
-#           callbacks=[evaluator])
-
-# model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights.{epoch:02d}-{loss:.2f}.hdf5')
-base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_base.{epoch:02d}-{loss:.2f}.hdf5')
+base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_for_prediction.hdf5')
 
 
 
