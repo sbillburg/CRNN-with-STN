@@ -2,6 +2,7 @@ import linecache
 import string
 import cv2
 import numpy as np
+# import tensorflow as tf
 from keras import backend as bknd
 from keras.callbacks import *
 from keras.layers import *
@@ -18,6 +19,7 @@ width = 200
 height = 31
 label_len = 16
 
+# Path of your 90k dataset files
 lexicon_dic_path = '/media/junbo/DATA/OCR_datasets/max/lexicon.txt'
 file_list = open('/media/junbo/DATA/OCR_datasets/max/annotation_train.txt', 'r')
 file_list_val = open('/media/junbo/DATA/OCR_datasets/max/annotation_val.txt', 'r')
@@ -28,7 +30,7 @@ characters = '0123456789'+string.ascii_lowercase+'-'
 
 inputShape = Input((width, height, 3))  # base on Tensorflow backend
 
-label_classes = len(characters)
+label_classes = len(characters)+1
 
 # load train data
 file_list_full = file_list.readlines()
@@ -71,9 +73,6 @@ def evaluate(input_model):
         else:
             print(result_str, y_test[m])
 
-        # if out.shape[1] == label_len:
-        #     batch_acc += ((y_test == out).sum(axis=1) == label_len).mean()
-    # return batch_acc / batch_num
     return correct_prediction*1.0/10
 
 
@@ -81,7 +80,7 @@ def ctc_lambda_func(args):
     iy_pred, ilabels, iinput_length, ilabel_length = args
     # the 2 is critical here since the first couple outputs of the RNN
     # tend to be garbage:
-    iy_pred = iy_pred[:, 2:, :] 
+    iy_pred = iy_pred[:, 2:, :]  # 测试感觉没影响
     return bknd.ctc_batch_cost(ilabels, iy_pred, iinput_length, ilabel_length)
 
 
@@ -122,7 +121,7 @@ def img_gen(batch_size=50):
 
             x[ii] = out_img
             y[ii] = [characters.find(c) for c in lexicon]
-        yield [x, y, np.ones(batch_size) * int(conv_shape[1] - 2), np.ones(batch_size) * label_len], y
+        yield [x, y, np.ones(batch_size) * int(stn_shape[1] - 2), np.ones(batch_size) * label_len], y
 
 
 def img_gen_val(batch_size=1000):
@@ -162,69 +161,63 @@ def img_gen_val(batch_size=1000):
 
 
 # initial bias_initializer
-def loc_b_init(shape, dtype=None):
+def loc_net():
     b = np.zeros((2, 3), dtype='float32')
     b[0, 0] = 1
     b[1, 1] = 1
-    return b.flatten()
+    W = np.zeros((64, 6), dtype='float32')
+    weights = [W, b.flatten()]
 
+    loc_input = Input((50, 7, 512))
 
-# spatial transformer network
-def loc_net(input_shape):
-    locnet = Sequential()
-    locnet.add(MaxPooling2D(pool_size=(2, 2), input_shape=input_shape))
-    locnet.add(Conv2D(20, (5, 5), activation='relu', padding='same'))
-    locnet.add(MaxPooling2D(pool_size=(2, 2)))
-    locnet.add(Conv2D(20, (5, 5), activation='relu', padding='same'))
+    loc_conv_1 = Conv2D(16, (5, 5), padding='same', activation='relu')(loc_input)
+    loc_conv_2 = Conv2D(32, (5, 5), padding='same', activation='relu')(loc_conv_1)
+    loc_fla = Flatten()(loc_conv_2)
+    loc_fc_1 = Dense(64, activation='relu')(loc_fla)
+    loc_fc_2 = Dense(6, weights=weights)(loc_fc_1)
 
-    locnet.add(Flatten())
-    locnet.add(Dense(50, activation='relu'))
-    locnet.add(Dense(6, kernel_initializer=initializers.zeros(), bias_initializer=loc_b_init))
+    locnet = Model(inputs=loc_input, outputs=loc_fc_2)
+
     return locnet
 
 
 # build model
 conv_1 = Conv2D(64, (3, 3), activation='relu', padding='same')(inputShape)
 batchnorm_1 = BatchNormalization()(conv_1)
-# pool_1 = MaxPooling2D(pool_size=(2, 2))(batchnorm_1)
 
 conv_2 = Conv2D(128, (3, 3), activation='relu', padding='same')(batchnorm_1)
-# batchnorm_2 = BatchNormalization()(conv_2)
-# pool_2 = MaxPooling2D(pool_size=(2, 2))(batchnorm_2)
-
 conv_3 = Conv2D(256, (3, 3), activation='relu', padding='same')(conv_2)
 batchnorm_3 = BatchNormalization()(conv_3)
 pool_3 = MaxPooling2D(pool_size=(2, 2))(batchnorm_3)
 
 conv_4 = Conv2D(256, (3, 3), activation='relu', padding='same')(pool_3)
-# batchnorm_2 = BatchNormalization()(conv_2)
-# pool_2 = MaxPooling2D(pool_size=(2, 2))(batchnorm_2)
-
 conv_5 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv_4)
 batchnorm_5 = BatchNormalization()(conv_5)
 pool_5 = MaxPooling2D(pool_size=(2, 2))(batchnorm_5)
 
 conv_6 = Conv2D(512, (3, 3), activation='relu', padding='same')(pool_5)
-# batchnorm_2 = BatchNormalization()(conv_2)
-# pool_2 = MaxPooling2D(pool_size=(2, 2))(batchnorm_2)
-
 conv_7 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv_6)
 batchnorm_7 = BatchNormalization()(conv_7)
 # pool_7 = MaxPooling2D(pool_size=(2, 2))(batchnorm_7)
 
-conv_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimension}256)
+bn_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimension}256)
 
-loc_input_shape = (conv_shape[1].value, conv_shape[2].value, conv_shape[3].value)
-stn_7 = SpatialTransformer(localization_net=loc_net(loc_input_shape),
-                           output_size=(loc_input_shape[0], loc_input_shape[1]),
-                           input_shape=loc_input_shape)(batchnorm_7)
+'''----------------------STN-------------------------'''
+loc_input_shape = (bn_shape[1].value, bn_shape[2].value, bn_shape[3].value)
+stn_locnet = loc_net()
+stn_7 = SpatialTransformer(localization_net=stn_locnet, output_size=(50, 7))(batchnorm_7)
+
+stn_shape = stn_7.get_shape()
+
+print(bn_shape)  # (?, 50, 7, 512)
+print(stn_shape)
 
 # reshape to (batch_size, width, height*dim)
-x_reshape = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(batchnorm_7)  # (?, 50, 3072)
+x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(stn_7)
+# x_reshape = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(batchnorm_7)
 
 fc_1 = Dense(128, activation='relu')(x_reshape)  # (?, 50, 128)
 
-print(conv_shape)  # (?, 50, 7, 512)
 print(x_reshape.get_shape())  # (?, 50, 3584)
 print(fc_1.get_shape())  # (?, 50, 128)
 
@@ -255,20 +248,21 @@ model = Model(inputs=[inputShape, labels, input_length, label_length], outputs=[
 
 # clipnorm seems to speeds up convergence
 sgd = SGD(lr=learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
+adam = optimizers.Adam()
+
 model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=sgd)
 
 model.summary()  # print a summary representation of your model.
-# plot_model(model, to_file='7layers_CNN.png', show_shapes=True)
+plot_model(model, to_file='CRNN_with_STN.png', show_shapes=True)
 
-model_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best.{epoch:02d}-{loss:.2f}.hdf5'
+model_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.{epoch:02d}-{loss:.2f}.hdf5'
 checkpoint = ModelCheckpoint(model_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
 
-# model.load_weights('/home/junbo/PycharmProjects/test0_mnist/models/weights_best.04-1.01.hdf5')
-model.fit_generator(img_gen(), steps_per_epoch=10000, epochs=20, verbose=1,
+model.fit_generator(img_gen(), steps_per_epoch=10000, epochs=30, verbose=1,
                     callbacks=[evaluator, checkpoint,
-                               TensorBoard(log_dir='/home/junbo/PycharmProjects/test0_mnist/CRC_n/paper_log')])
 
-base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_for_prediction.hdf5')
+
+base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_for_predict_STN.hdf5')
 
 
 
