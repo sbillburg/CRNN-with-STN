@@ -104,9 +104,6 @@ def img_gen(batch_size=50):
                     if img_size[1] > 2 and img_size[0] > 2:
                         break
 
-            # print(img_size[1]/img_size[0]*1.0)
-            # print(img_size[1], img_size[0])
-
             if (img_size[1]/img_size[0]*1.0) < 6.4:
                 img_reshape = cv2.resize(img, (int(31.0/img_size[0]*img_size[1]), height))
                 mat_ori = np.zeros((height, width - int(31.0/img_size[0]*img_size[1]), 3), dtype=np.uint8)
@@ -151,11 +148,7 @@ def img_gen_val(batch_size=1000):
                 out_img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
                 out_img = np.asarray(out_img).transpose([1, 0, 2])
 
-            # while len(lexicon) < label_len:
-            #     lexicon += "-"
-
             x[ii] = out_img
-            # y[ii] = [characters.find(c) for c in lexicon]
             y.append(lexicon)
         yield x, y
 
@@ -198,7 +191,6 @@ pool_5 = MaxPooling2D(pool_size=(2, 2))(batchnorm_5)
 conv_6 = Conv2D(512, (3, 3), activation='relu', padding='same')(pool_5)
 conv_7 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv_6)
 batchnorm_7 = BatchNormalization()(conv_7)
-# pool_7 = MaxPooling2D(pool_size=(2, 2))(batchnorm_7)
 
 bn_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimension}256)
 
@@ -206,15 +198,10 @@ bn_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimensi
 loc_input_shape = (bn_shape[1].value, bn_shape[2].value, bn_shape[3].value)
 stn_locnet = loc_net()
 stn_7 = SpatialTransformer(localization_net=stn_locnet, output_size=(50, 7))(batchnorm_7)
-
 stn_shape = stn_7.get_shape()
-
-print(bn_shape)  # (?, 50, 7, 512)
-print(stn_shape)
 
 # reshape to (batch_size, width, height*dim)
 x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(stn_7)
-# x_reshape = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(batchnorm_7)
 
 fc_1 = Dense(128, activation='relu')(x_reshape)  # (?, 50, 128)
 
