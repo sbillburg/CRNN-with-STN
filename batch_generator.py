@@ -44,10 +44,6 @@ def img_gen(batch_size=50, input_shape=None):
                     img_size = img.shape  # (height, width, channels)
                     if img_size[1] > 2 and img_size[0] > 2:
                         break
-
-            # print(img_size[1]/img_size[0]*1.0)
-            # print(img_size[1], img_size[0])
-
             if (img_size[1]/img_size[0]*1.0) < 6.4:
                 img_reshape = cv2.resize(img, (int(31.0/img_size[0]*img_size[1]), height))
                 mat_ori = np.zeros((height, width - int(31.0/img_size[0]*img_size[1]), 3), dtype=np.uint8)
@@ -92,10 +88,6 @@ def img_gen_val(batch_size=1000):
                 out_img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
                 out_img = np.asarray(out_img).transpose([1, 0, 2])
 
-            # while len(lexicon) < label_len:
-            #     lexicon += "-"
-
             x[ii] = out_img
-            # y[ii] = [characters.find(c) for c in lexicon]
             y.append(lexicon)
         yield x, y
