@@ -12,7 +12,6 @@ from batch_generator import width, height, characters, label_len, label_classes
 from batch_generator import img_gen, img_gen_val
 
 learning_rate = 0.002
-inputShape = Input((width, height, 3))  # base on Tensorflow backend
 
 
 # functions
@@ -58,7 +57,7 @@ def ctc_lambda_func(args):
     return bknd.ctc_batch_cost(ilabels, iy_pred, iinput_length, ilabel_length)
 
 
-# initial bias_initializer
+# initial Localization Network
 def loc_net(input_shape):
     b = np.zeros((2, 3), dtype='float32')
     b[0, 0] = 1
@@ -80,15 +79,8 @@ def loc_net(input_shape):
 
 
 # build model
-
-'''----------------------STN-------------------------'''
-stn_input_shape = inputShape.get_shape()
-loc_input_shape = (stn_input_shape[1].value, stn_input_shape[2].value, stn_input_shape[3].value)
-stn = SpatialTransformer(localization_net=loc_net(loc_input_shape),
-                         output_size=(loc_input_shape[0], loc_input_shape[1]))(inputShape)
-
-
-conv_1 = Conv2D(64, (3, 3), activation='relu', padding='same')(stn)
+inputShape = Input((width, height, 3))  # base on Tensorflow backend
+conv_1 = Conv2D(64, (3, 3), activation='relu', padding='same')(inputShape)
 batchnorm_1 = BatchNormalization()(conv_1)
 # pool_1 = MaxPooling2D(pool_size=(2, 2))(batchnorm_1)
 
@@ -109,20 +101,26 @@ batchnorm_7 = BatchNormalization()(conv_7)
 bn_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimension}256)
 print(bn_shape)  # (?, 50, 7, 512)
 
-x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(batchnorm_7)
+'''----------------------STN-------------------------'''
+stn_input_shape = batchnorm_7.get_shape()
+loc_input_shape = (stn_input_shape[1].value, stn_input_shape[2].value, stn_input_shape[3].value)
+stn = SpatialTransformer(localization_net=loc_net(loc_input_shape),
+                         output_size=(loc_input_shape[0], loc_input_shape[1]))(batchnorm_7)
+
+x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(stn)
 
 fc_1 = Dense(128, activation='relu')(x_reshape)  # (?, 50, 128)
 
 print(x_reshape.get_shape())  # (?, 50, 3584)
 print(fc_1.get_shape())  # (?, 50, 128)
 
-rnn_1 = LSTM(128, name="rnn1", kernel_initializer="he_normal", return_sequences=True)(fc_1)
-rnn_1b = LSTM(128, name="rnn1_b", kernel_initializer="he_normal",
+rnn_1 = LSTM(128, kernel_initializer="he_normal", return_sequences=True)(fc_1)
+rnn_1b = LSTM(128, kernel_initializer="he_normal",
               go_backwards=True, return_sequences=True)(fc_1)
 rnn1_merged = add([rnn_1, rnn_1b])
 
-rnn_2 = LSTM(128, name="rnn2", kernel_initializer="he_normal", return_sequences=True)(rnn1_merged)
-rnn_2b = LSTM(128, name="rnn2_b", kernel_initializer="he_normal",
+rnn_2 = LSTM(128, kernel_initializer="he_normal", return_sequences=True)(rnn1_merged)
+rnn_2b = LSTM(128, kernel_initializer="he_normal",
               go_backwards=True, return_sequences=True)(rnn1_merged)
 rnn2_merged = concatenate([rnn_2, rnn_2b])
 
@@ -158,7 +156,7 @@ checkpoint = ModelCheckpoint(model_save_path, monitor='loss', verbose=1, save_be
 # model.load_weights('/home/junbo/PycharmProjects/test0_mnist/models/weights_best.04-1.01.hdf5')
 model.fit_generator(img_gen(input_shape=bn_shape), steps_per_epoch=2000, epochs=100, verbose=1,
                     callbacks=[evaluator,
-                               # checkpoint,
+                               checkpoint,
                                TensorBoard(log_dir='/home/junbo/PycharmProjects/test0_mnist/CRC_n/paper_log')])
 
 base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_for_predict_STN.hdf5')
