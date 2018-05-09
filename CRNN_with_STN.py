@@ -8,8 +8,8 @@ from keras.callbacks import ModelCheckpoint
 from keras.callbacks import TensorBoard
 
 from STN.spatial_transformer import SpatialTransformer
-from batch_generator import width, height, characters, label_len, label_classes
-from batch_generator import img_gen, img_gen_val
+from Batch_Generator import width, height, characters, label_len, label_classes
+from Batch_Generator import img_gen, img_gen_val
 
 learning_rate = 0.002
 
