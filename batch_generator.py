@@ -24,17 +24,6 @@ file_list_len = len(file_list_full)
 file_list_val_full = file_list_val.readlines()
 file_list_val_len = len(file_list_val_full)
 
-# # img_path_val = []
-# lexicon_val = []
-# for i in range(file_list_val_len):
-#     file_list_full_val_split = [m for m in file_list_full[i].split()]
-#     img_path_val.append('/media/junbo/新加卷/OCR Datasets/max/90kDICT32px'+file_list_full_val_split[0][1:])
-#     lexicon = linecache.getline(lexicon_dic_path, int(file_list_full_val_split[1])+1).strip("\n")
-#     while len(lexicon) < label_len:
-#         lexicon += "-"
-#     lexicon_val.append(lexicon)
-# file_list_val_full = []
-
 
 def img_gen(batch_size=50, input_shape=None):
     x = np.zeros((batch_size, width, height, 3), dtype=np.uint8)
