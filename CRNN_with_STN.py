@@ -1,45 +1,19 @@
-import linecache
-import string
-import cv2
-import numpy as np
-# import tensorflow as tf
 from keras import backend as bknd
 from keras.callbacks import *
 from keras.layers import *
 from keras.models import *
 from keras.optimizers import SGD
 from keras.utils import *
-
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import TensorBoard
 
 from STN.spatial_transformer import SpatialTransformer
-
-width = 200
-height = 31
-label_len = 16
-
-# Path of your 90k dataset files
-lexicon_dic_path = '/media/junbo/DATA/OCR_datasets/max/lexicon.txt'
-file_list = open('/media/junbo/DATA/OCR_datasets/max/annotation_train.txt', 'r')
-file_list_val = open('/media/junbo/DATA/OCR_datasets/max/annotation_val.txt', 'r')
-img_folder = '/media/junbo/DATA/OCR_datasets/max/90kDICT32px'
+from batch_generator import width, height, characters, label_len, label_classes
+from batch_generator import img_gen, img_gen_val
 
 learning_rate = 0.002
-characters = '0123456789'+string.ascii_lowercase+'-'
-
 inputShape = Input((width, height, 3))  # base on Tensorflow backend
 
-label_classes = len(characters)+1
-
-# load train data
-file_list_full = file_list.readlines()
-file_list_len = len(file_list_full)
-
-
-# load validation data
-file_list_val_full = file_list_val.readlines()
-file_list_val_len = len(file_list_val_full)
 
 # functions
 class Evaluate(Callback):
@@ -57,9 +31,9 @@ def evaluate(input_model):
     correct_prediction = 0
     generator = img_gen_val()
 
-    X_test, y_test = next(generator)
+    x_test, y_test = next(generator)
     # print(" ")
-    y_pred = input_model.predict(X_test)  # y_pred.shape is (100, 25, 12)
+    y_pred = input_model.predict(x_test)  # y_pred.shape is (100, 25, 12)
     shape = y_pred[:, 2:, :].shape  # (100, 23, 12)
     ctc_decode = bknd.ctc_decode(y_pred[:, 2:, :], input_length=np.ones(shape[0])*shape[1])[0][0]
     out = bknd.get_value(ctc_decode)[:, :label_len]
@@ -72,7 +46,7 @@ def evaluate(input_model):
             # print(m)
         else:
             print(result_str, y_test[m])
-
+            
     return correct_prediction*1.0/10
 
 
@@ -80,88 +54,19 @@ def ctc_lambda_func(args):
     iy_pred, ilabels, iinput_length, ilabel_length = args
     # the 2 is critical here since the first couple outputs of the RNN
     # tend to be garbage:
-    iy_pred = iy_pred[:, 2:, :]  # 测试感觉没影响
+    iy_pred = iy_pred[:, 2:, :] 
     return bknd.ctc_batch_cost(ilabels, iy_pred, iinput_length, ilabel_length)
 
 
-def img_gen(batch_size=50):
-    x = np.zeros((batch_size, width, height, 3), dtype=np.uint8)
-    y = np.zeros((batch_size, label_len), dtype=np.uint8)
-    # y = np.zeros((batch_size, ), dtype=np.uint8)
-
-    while True:
-        for ii in range(batch_size):
-
-            while True:  # abandon the lexicon which is longer than 16 characters
-                pick_index = np.random.randint(0, file_list_len - 1)
-                file_list_full_split = [m for m in file_list_full[pick_index].split()]
-                lexicon = linecache.getline(lexicon_dic_path, int(file_list_full_split[1]) + 1).strip("\n")
-                img_path = img_folder + file_list_full_split[0][1:]
-                img = cv2.imread(img_path)
-                # some images in dataset damaged during unzip
-                if (img is not None) and len(lexicon) <= label_len:
-                    img_size = img.shape  # (height, width, channels)
-                    if img_size[1] > 2 and img_size[0] > 2:
-                        break
-
-            if (img_size[1]/img_size[0]*1.0) < 6.4:
-                img_reshape = cv2.resize(img, (int(31.0/img_size[0]*img_size[1]), height))
-                mat_ori = np.zeros((height, width - int(31.0/img_size[0]*img_size[1]), 3), dtype=np.uint8)
-                out_img = np.concatenate([img_reshape, mat_ori], axis=1).transpose([1, 0, 2])
-            else:
-                out_img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
-                out_img = np.asarray(out_img).transpose([1, 0, 2])
-
-            # due to the explanation of ctc_loss, try to not add "-" for blank
-            while len(lexicon) < label_len:
-                lexicon += "-"
-
-            x[ii] = out_img
-            y[ii] = [characters.find(c) for c in lexicon]
-        yield [x, y, np.ones(batch_size) * int(stn_shape[1] - 2), np.ones(batch_size) * label_len], y
-
-
-def img_gen_val(batch_size=1000):
-    x = np.zeros((batch_size, width, height, 3), dtype=np.uint8)
-    # y = np.zeros((batch_size, label_len), dtype=np.uint8)
-    y = []
-
-    while True:
-        for ii in range(batch_size):
-
-            while True:  # abandon the lexicon which is longer than 16 characters
-                pick_index = np.random.randint(0, file_list_val_len - 1)
-                file_list_full_split = [m for m in file_list_val_full[pick_index].split()]
-                lexicon = linecache.getline(lexicon_dic_path, int(file_list_full_split[1]) + 1).strip("\n")
-                img_path = img_folder + file_list_full_split[0][1:]
-                img = cv2.imread(img_path)
-                if (img is not None) and len(lexicon) <= label_len:
-                    img_size = img.shape  # (height, width, channels)
-                    if img_size[1] > 2 and img_size[0] > 2:
-                        break
-
-            if (img_size[1]/img_size[0]*1.0) < 6.4:
-                img_reshape = cv2.resize(img, (int(31.0/img_size[0]*img_size[1]), height))
-                mat_ori = np.zeros((height, width - int(31.0/img_size[0]*img_size[1]), 3), dtype=np.uint8)
-                out_img = np.concatenate([img_reshape, mat_ori], axis=1).transpose([1, 0, 2])
-            else:
-                out_img = cv2.resize(img, (width, height), interpolation=cv2.INTER_CUBIC)
-                out_img = np.asarray(out_img).transpose([1, 0, 2])
-
-            x[ii] = out_img
-            y.append(lexicon)
-        yield x, y
-
-
 # initial bias_initializer
-def loc_net():
+def loc_net(input_shape):
     b = np.zeros((2, 3), dtype='float32')
     b[0, 0] = 1
     b[1, 1] = 1
-    W = np.zeros((64, 6), dtype='float32')
-    weights = [W, b.flatten()]
+    w = np.zeros((64, 6), dtype='float32')
+    weights = [w, b.flatten()]
 
-    loc_input = Input((50, 7, 512))
+    loc_input = Input(input_shape)
 
     loc_conv_1 = Conv2D(16, (5, 5), padding='same', activation='relu')(loc_input)
     loc_conv_2 = Conv2D(32, (5, 5), padding='same', activation='relu')(loc_conv_1)
@@ -169,16 +74,25 @@ def loc_net():
     loc_fc_1 = Dense(64, activation='relu')(loc_fla)
     loc_fc_2 = Dense(6, weights=weights)(loc_fc_1)
 
-    locnet = Model(inputs=loc_input, outputs=loc_fc_2)
+    output = Model(inputs=loc_input, outputs=loc_fc_2)
 
-    return locnet
+    return output
 
 
 # build model
-conv_1 = Conv2D(64, (3, 3), activation='relu', padding='same')(inputShape)
-batchnorm_1 = BatchNormalization()(conv_1)
 
-conv_2 = Conv2D(128, (3, 3), activation='relu', padding='same')(batchnorm_1)
+'''----------------------STN-------------------------'''
+stn_input_shape = inputShape.get_shape()
+loc_input_shape = (stn_input_shape[1].value, stn_input_shape[2].value, stn_input_shape[3].value)
+stn = SpatialTransformer(localization_net=loc_net(loc_input_shape),
+                         output_size=(loc_input_shape[0], loc_input_shape[1]))(inputShape)
+
+
+conv_1 = Conv2D(64, (3, 3), activation='relu', padding='same')(stn)
+batchnorm_1 = BatchNormalization()(conv_1)
+# pool_1 = MaxPooling2D(pool_size=(2, 2))(batchnorm_1)
+
+conv_2 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv_1)
 conv_3 = Conv2D(256, (3, 3), activation='relu', padding='same')(conv_2)
 batchnorm_3 = BatchNormalization()(conv_3)
 pool_3 = MaxPooling2D(pool_size=(2, 2))(batchnorm_3)
@@ -193,15 +107,9 @@ conv_7 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv_6)
 batchnorm_7 = BatchNormalization()(conv_7)
 
 bn_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimension}256)
+print(bn_shape)  # (?, 50, 7, 512)
 
-'''----------------------STN-------------------------'''
-loc_input_shape = (bn_shape[1].value, bn_shape[2].value, bn_shape[3].value)
-stn_locnet = loc_net()
-stn_7 = SpatialTransformer(localization_net=stn_locnet, output_size=(50, 7))(batchnorm_7)
-stn_shape = stn_7.get_shape()
-
-# reshape to (batch_size, width, height*dim)
-x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(stn_7)
+x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(batchnorm_7)
 
 fc_1 = Dense(128, activation='relu')(x_reshape)  # (?, 50, 128)
 
@@ -238,6 +146,8 @@ sgd = SGD(lr=learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 adam = optimizers.Adam()
 
 model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=sgd)
+# model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
+# model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer='adadelta')
 
 model.summary()  # print a summary representation of your model.
 plot_model(model, to_file='CRNN_with_STN.png', show_shapes=True)
@@ -245,11 +155,10 @@ plot_model(model, to_file='CRNN_with_STN.png', show_shapes=True)
 model_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.{epoch:02d}-{loss:.2f}.hdf5'
 checkpoint = ModelCheckpoint(model_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
 
-model.fit_generator(img_gen(), steps_per_epoch=10000, epochs=30, verbose=1,
-                    callbacks=[evaluator, checkpoint,
-
+# model.load_weights('/home/junbo/PycharmProjects/test0_mnist/models/weights_best.04-1.01.hdf5')
+model.fit_generator(img_gen(input_shape=bn_shape), steps_per_epoch=2000, epochs=100, verbose=1,
+                    callbacks=[evaluator,
+                               # checkpoint,
+                               TensorBoard(log_dir='/home/junbo/PycharmProjects/test0_mnist/CRC_n/paper_log')])
 
 base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_for_predict_STN.hdf5')
-
-
-
