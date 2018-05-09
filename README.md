@@ -12,8 +12,8 @@ Train on Synthetic Word Dataset realsed by M. Jaderberg et al. You can download 
 ## Reference
 
 ### CRNN(Convolutional Recurrent Neural Network)
-Shi, Baoguang, X. Bai, and C. Yao. *"An End-to-End Trainable Neural Network for Image-based Sequence Recognition and Its Application to Scene Text Recognition."* IEEE Transactions on Pattern Analysis & Machine Intelligence PP.99(2016):1-1.[[arxiv]](https://arxiv.org/abs/1507.05717)
+Shi, Baoguang, X. Bai, and C. Yao. ***"An End-to-End Trainable Neural Network for Image-based Sequence Recognition and Its Application to Scene Text Recognition."*** IEEE Transactions on Pattern Analysis & Machine Intelligence PP.99(2016):1-1.[[arxiv]](https://arxiv.org/abs/1507.05717)
 
 ### STN(Spatial Transformer Network)
-Max Jaderberg, Karen Simonyan,Andrew Zisserman and Koray Kavukcuoglu. *"Spatial Transformer Network"* [[arxiv]](https://arxiv.org/abs/1506.02025)
+Max Jaderberg, Karen Simonyan,Andrew Zisserman and Koray Kavukcuoglu. ***"Spatial Transformer Network"*** [[arxiv]](https://arxiv.org/abs/1506.02025)
 
