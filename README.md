@@ -8,6 +8,9 @@ You can run CRNN individually by just remove the STN components as well. The CRN
 
 Train on Synthetic Word Dataset realsed by M. Jaderberg et al. You can download the dataset [HERE](http://www.robots.ox.ac.uk/~vgg/data/text/#sec-synth)
 
+## How to Run
+
+Just run the CRNN_with_STN.py script.
 
 ## Reference
 
