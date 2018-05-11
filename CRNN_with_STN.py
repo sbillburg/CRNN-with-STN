@@ -12,7 +12,7 @@ from STN.spatial_transformer import SpatialTransformer
 
 from batch_generator import img_gen, img_gen_val
 
-from CRNN_paper_config import learning_rate, load_model_path, width, height, characters, label_len, label_classes, \
+from config import learning_rate, load_model_path, width, height, characters, label_len, label_classes, \
     cp_save_path, base_model_path, tb_log_dir
 
     
