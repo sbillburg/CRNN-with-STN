@@ -1,20 +1,10 @@
 import cv2
 import numpy as np
 import linecache
-import string
 
-width = 200
-height = 31
-label_len = 16
-
-lexicon_dic_path = '/media/junbo/DATA/OCR_datasets/max/lexicon.txt'
-file_list = open('/media/junbo/DATA/OCR_datasets/max/annotation_train.txt', 'r')
-file_list_val = open('/media/junbo/DATA/OCR_datasets/max/annotation_val.txt', 'r')
-img_folder = '/media/junbo/DATA/OCR_datasets/max/90kDICT32px'
-
-characters = '0123456789'+string.ascii_lowercase+'-'
-label_classes = len(characters)+1
-
+from config import width, height, label_len, lexicon_dic_path, file_list, file_list_val, img_folder, \
+    characters
+    
 # load train data
 file_list_full = file_list.readlines()
 file_list_len = len(file_list_full)
