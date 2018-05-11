@@ -8,10 +8,14 @@ from keras.callbacks import ModelCheckpoint
 from keras.callbacks import TensorBoard
 
 from STN.spatial_transformer import SpatialTransformer
-from Batch_Generator import width, height, characters, label_len, label_classes
-from Batch_Generator import img_gen, img_gen_val
 
-learning_rate = 0.002
+from batch_generator import width, height, characters, label_len, label_classes
+from batch_generator import img_gen, img_gen_val
+
+learning_rate = 0.0001  # 0.002 for default
+
+# if you're going to train a new model, set the load_model_path = "" 
+load_model_path = 'your/trained/model.hdf5'
 
 
 # functions
@@ -22,7 +26,6 @@ class Evaluate(Callback):
         print('')
         print('acc:'+str(acc)+"%")
 
-
 evaluator = Evaluate()
 
 
@@ -32,8 +35,8 @@ def evaluate(input_model):
 
     x_test, y_test = next(generator)
     # print(" ")
-    y_pred = input_model.predict(x_test)  # y_pred.shape is (100, 25, 12)
-    shape = y_pred[:, 2:, :].shape  # (100, 23, 12)
+    y_pred = input_model.predict(x_test) 
+    shape = y_pred[:, 2:, :].shape 
     ctc_decode = bknd.ctc_decode(y_pred[:, 2:, :], input_length=np.ones(shape[0])*shape[1])[0][0]
     out = bknd.get_value(ctc_decode)[:, :label_len]
 
@@ -42,22 +45,18 @@ def evaluate(input_model):
         result_str = result_str.replace('-', '')
         if result_str == y_test[m]:
             correct_prediction += 1
-            # print(m)
         else:
             print(result_str, y_test[m])
-            
     return correct_prediction*1.0/10
 
 
 def ctc_lambda_func(args):
     iy_pred, ilabels, iinput_length, ilabel_length = args
-    # the 2 is critical here since the first couple outputs of the RNN
-    # tend to be garbage:
-    iy_pred = iy_pred[:, 2:, :] 
+    iy_pred = iy_pred[:, 2:, :]  # no such influence
     return bknd.ctc_batch_cost(ilabels, iy_pred, iinput_length, ilabel_length)
 
 
-# initial Localization Network
+# initial bias_initializer
 def loc_net(input_shape):
     b = np.zeros((2, 3), dtype='float32')
     b[0, 0] = 1
@@ -72,7 +71,6 @@ def loc_net(input_shape):
     loc_fla = Flatten()(loc_conv_2)
     loc_fc_1 = Dense(64, activation='relu')(loc_fla)
     loc_fc_2 = Dense(6, weights=weights)(loc_fc_1)
-
     output = Model(inputs=loc_input, outputs=loc_fc_2)
 
     return output
@@ -99,14 +97,15 @@ conv_7 = Conv2D(512, (3, 3), activation='relu', padding='same')(conv_6)
 batchnorm_7 = BatchNormalization()(conv_7)
 
 bn_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimension}256)
-print(bn_shape)  # (?, 50, 7, 512)
 
 '''----------------------STN-------------------------'''
 stn_input_shape = batchnorm_7.get_shape()
 loc_input_shape = (stn_input_shape[1].value, stn_input_shape[2].value, stn_input_shape[3].value)
 stn = SpatialTransformer(localization_net=loc_net(loc_input_shape),
                          output_size=(loc_input_shape[0], loc_input_shape[1]))(batchnorm_7)
+'''----------------------STN-------------------------'''
 
+print(bn_shape)  # (?, 50, 7, 512)
 x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(stn)
 
 fc_1 = Dense(128, activation='relu')(x_reshape)  # (?, 50, 128)
@@ -115,13 +114,11 @@ print(x_reshape.get_shape())  # (?, 50, 3584)
 print(fc_1.get_shape())  # (?, 50, 128)
 
 rnn_1 = LSTM(128, kernel_initializer="he_normal", return_sequences=True)(fc_1)
-rnn_1b = LSTM(128, kernel_initializer="he_normal",
-              go_backwards=True, return_sequences=True)(fc_1)
+rnn_1b = LSTM(128, kernel_initializer="he_normal", go_backwards=True, return_sequences=True)(fc_1)
 rnn1_merged = add([rnn_1, rnn_1b])
 
 rnn_2 = LSTM(128, kernel_initializer="he_normal", return_sequences=True)(rnn1_merged)
-rnn_2b = LSTM(128, kernel_initializer="he_normal",
-              go_backwards=True, return_sequences=True)(rnn1_merged)
+rnn_2b = LSTM(128, kernel_initializer="he_normal", go_backwards=True, return_sequences=True)(rnn1_merged)
 rnn2_merged = concatenate([rnn_2, rnn_2b])
 
 drop_1 = Dropout(0.25)(rnn2_merged)
@@ -144,19 +141,20 @@ sgd = SGD(lr=learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 adam = optimizers.Adam()
 
 model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=sgd)
-# model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
-# model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer='adadelta')
 
 model.summary()  # print a summary representation of your model.
 plot_model(model, to_file='CRNN_with_STN.png', show_shapes=True)
 
-model_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.{epoch:02d}-{loss:.2f}.hdf5'
-checkpoint = ModelCheckpoint(model_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
+best_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.{epoch:02d}-{loss:.2f}.hdf5'
+checkpoint = ModelCheckpoint(best_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
 
-# model.load_weights('/home/junbo/PycharmProjects/test0_mnist/models/weights_best.04-1.01.hdf5')
-model.fit_generator(img_gen(input_shape=bn_shape), steps_per_epoch=2000, epochs=100, verbose=1,
+if len(load_model_path) > 5:
+    model.load_weights(load_model_path)
+
+model.fit_generator(img_gen(input_shape=bn_shape), steps_per_epoch=2000, epochs=50, verbose=1,
                     callbacks=[evaluator,
                                checkpoint,
                                TensorBoard(log_dir='/home/junbo/PycharmProjects/test0_mnist/CRC_n/paper_log')])
 
+# base_model is the model for predicting, you can look up evaluate() method for how to use it.
 base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_for_predict_STN.hdf5')
