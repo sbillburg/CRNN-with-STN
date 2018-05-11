@@ -4,20 +4,18 @@ from keras.layers import *
 from keras.models import *
 from keras.optimizers import SGD
 from keras.utils import *
+
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import TensorBoard
 
 from STN.spatial_transformer import SpatialTransformer
 
-from batch_generator import width, height, characters, label_len, label_classes
 from batch_generator import img_gen, img_gen_val
 
-learning_rate = 0.0001  # 0.002 for default
+from CRNN_paper_config import learning_rate, load_model_path, width, height, characters, label_len, label_classes, \
+    cp_save_path, base_model_path, tb_log_dir
 
-# if you're going to train a new model, set the load_model_path = "" 
-load_model_path = 'your/trained/model.hdf5'
-
-
+    
 # functions
 class Evaluate(Callback):
 
@@ -45,13 +43,17 @@ def evaluate(input_model):
         result_str = result_str.replace('-', '')
         if result_str == y_test[m]:
             correct_prediction += 1
+            # print(m)
         else:
             print(result_str, y_test[m])
+
     return correct_prediction*1.0/10
 
 
 def ctc_lambda_func(args):
     iy_pred, ilabels, iinput_length, ilabel_length = args
+    # the 2 is critical here since the first couple outputs of the RNN
+    # tend to be garbage:
     iy_pred = iy_pred[:, 2:, :]  # no such influence
     return bknd.ctc_batch_cost(ilabels, iy_pred, iinput_length, ilabel_length)
 
@@ -71,6 +73,7 @@ def loc_net(input_shape):
     loc_fla = Flatten()(loc_conv_2)
     loc_fc_1 = Dense(64, activation='relu')(loc_fla)
     loc_fc_2 = Dense(6, weights=weights)(loc_fc_1)
+
     output = Model(inputs=loc_input, outputs=loc_fc_2)
 
     return output
@@ -80,7 +83,6 @@ def loc_net(input_shape):
 inputShape = Input((width, height, 3))  # base on Tensorflow backend
 conv_1 = Conv2D(64, (3, 3), activation='relu', padding='same')(inputShape)
 batchnorm_1 = BatchNormalization()(conv_1)
-# pool_1 = MaxPooling2D(pool_size=(2, 2))(batchnorm_1)
 
 conv_2 = Conv2D(128, (3, 3), activation='relu', padding='same')(conv_1)
 conv_3 = Conv2D(256, (3, 3), activation='relu', padding='same')(conv_2)
@@ -106,6 +108,9 @@ stn = SpatialTransformer(localization_net=loc_net(loc_input_shape),
 '''----------------------STN-------------------------'''
 
 print(bn_shape)  # (?, 50, 7, 512)
+
+# reshape to (batch_size, width, height*dim)
+# x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(stn_7)
 x_reshape = Reshape(target_shape=(int(bn_shape[1]), int(bn_shape[2] * bn_shape[3])))(stn)
 
 fc_1 = Dense(128, activation='relu')(x_reshape)  # (?, 50, 128)
@@ -145,8 +150,7 @@ model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=sgd)
 model.summary()  # print a summary representation of your model.
 plot_model(model, to_file='CRNN_with_STN.png', show_shapes=True)
 
-best_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.{epoch:02d}-{loss:.2f}.hdf5'
-checkpoint = ModelCheckpoint(best_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
+checkpoint = ModelCheckpoint(cp_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
 
 if len(load_model_path) > 5:
     model.load_weights(load_model_path)
@@ -154,7 +158,6 @@ if len(load_model_path) > 5:
 model.fit_generator(img_gen(input_shape=bn_shape), steps_per_epoch=2000, epochs=50, verbose=1,
                     callbacks=[evaluator,
                                checkpoint,
-                               TensorBoard(log_dir='/home/junbo/PycharmProjects/test0_mnist/CRC_n/paper_log')])
+                               TensorBoard(log_dir=tb_log_dir)])
 
-# base_model is the model for predicting, you can look up evaluate() method for how to use it.
-base_model.save('/home/junbo/PycharmProjects/test0_mnist/models/weights_for_predict_STN.hdf5')
+base_model.save(base_model_path)
