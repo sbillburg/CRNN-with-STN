@@ -1,5 +1,5 @@
 # CRNN-with-STN
-implement CRNN in Keras with Spatial Transformer  Network
+implement CRNN in Keras with Spatial Transformer Network (STN) for Optical Character Recognition(OCR)
 
 
 Trainable but performance of recognition is not improved, meanwhile the loss raises up.
