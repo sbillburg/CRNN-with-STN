@@ -21,5 +21,6 @@ cp_save_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.
 base_model_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_for_predict_STN.hdf5'  \
     # the model for predicting
 tb_log_dir = '/home/junbo/PycharmProjects/test0_mnist/CRC_n/paper_log'  # TensorBoard save path, Optional
-load_model_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.95-1.65.hdf5'  # Optional
+load_model_path = '/home/junbo/PycharmProjects/test0_mnist/models/weights_best_STN.95-1.65.hdf5'  \
+    # if you want to train a new model, please set  load_model_path = ""
 
