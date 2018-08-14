@@ -2,9 +2,9 @@
 implement CRNN in Keras with Spatial Transformer Network (STN) for Optical Character Recognition(OCR)
 
 
-Trainable but performance of recognition is not improved, meanwhile the loss raises up.
+The model is easy to start a trainning, but the performance of recognition is not better than the original CRNN without STN.
 
-You can run CRNN individually by just remove the STN components as well. The CRNN can reach 90% of recognition accuracy.
+You can run CRNN individually by just remove the STN components, and connect *batchnorm_7* to *x_shape*. The CRNN can reach 90% of recognition accuracy.
 
 Train on Synthetic Word Dataset realsed by M. Jaderberg et al. You can download the dataset [HERE](http://www.robots.ox.ac.uk/~vgg/data/text/#sec-synth)
 
