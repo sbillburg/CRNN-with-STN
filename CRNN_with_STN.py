@@ -101,6 +101,8 @@ batchnorm_7 = BatchNormalization()(conv_7)
 bn_shape = batchnorm_7.get_shape()  # (?, {dimension}50, {dimension}12, {dimension}256)
 
 '''----------------------STN-------------------------'''
+# you can run the model without this STN part by commenting out the STN lines then connecting batchnorm_7 to x_reshape,
+# which may bring you a higher accuracy
 stn_input_shape = batchnorm_7.get_shape()
 loc_input_shape = (stn_input_shape[1].value, stn_input_shape[2].value, stn_input_shape[3].value)
 stn = SpatialTransformer(localization_net=loc_net(loc_input_shape),
@@ -148,13 +150,16 @@ adam = optimizers.Adam()
 model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=sgd)
 
 model.summary()  # print a summary representation of your model.
-plot_model(model, to_file='CRNN_with_STN.png', show_shapes=True)
+plot_model(model, to_file='CRNN_with_STN.png', show_shapes=True)  # save a image which is the architecture of the model 
 
 checkpoint = ModelCheckpoint(cp_save_path, monitor='loss', verbose=1, save_best_only=True, mode='min')
 
+# if you want to load a trained model weights, just fill the load_model_path in config.py, it will automaticlly add into the
+# new trainning. if you want to train a new model, just set load_model_path = ''.
 if len(load_model_path) > 5:
     model.load_weights(load_model_path)
 
+# try your own fit_generator() settings, you may get a better result
 model.fit_generator(img_gen(input_shape=bn_shape), steps_per_epoch=2000, epochs=50, verbose=1,
                     callbacks=[evaluator,
                                checkpoint,
