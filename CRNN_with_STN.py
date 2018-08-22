@@ -133,7 +133,7 @@ drop_1 = Dropout(0.25)(rnn2_merged)
 fc_2 = Dense(label_classes, kernel_initializer='he_normal', activation='softmax')(drop_1)
 
 # model setting
-base_model = Model(inputs=inputShape, outputs=fc_2)
+base_model = Model(inputs=inputShape, outputs=fc_2)  # the model for prediecting
 
 labels = Input(name='the_labels', shape=[label_len], dtype='float32')
 input_length = Input(name='input_length', shape=[1], dtype='int64')
@@ -141,7 +141,7 @@ label_length = Input(name='label_length', shape=[1], dtype='int64')
 
 loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([fc_2, labels, input_length, label_length])
 
-model = Model(inputs=[inputShape, labels, input_length, label_length], outputs=[loss_out])
+model = Model(inputs=[inputShape, labels, input_length, label_length], outputs=[loss_out])  # the model for trainning
 
 # clipnorm seems to speeds up convergence
 sgd = SGD(lr=learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
