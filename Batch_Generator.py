@@ -29,7 +29,8 @@ def img_gen(batch_size=50, input_shape=None):
                 lexicon = linecache.getline(lexicon_dic_path, int(file_list_full_split[1]) + 1).strip("\n")
                 img_path = img_folder + file_list_full_split[0][1:]
                 img = cv2.imread(img_path)
-                # some images in dataset damaged during unzip
+                # abandon the lexicon which is longer than 16 characters, because I set the label_len = 16, you can change it anyway.
+                # some dataset images may be damaged during unzip
                 if (img is not None) and len(lexicon) <= label_len:
                     img_size = img.shape  # (height, width, channels)
                     if img_size[1] > 2 and img_size[0] > 2:
@@ -59,12 +60,14 @@ def img_gen_val(batch_size=1000):
     while True:
         for ii in range(batch_size):
 
-            while True:  # abandon the lexicon which is longer than 16 characters
+            while True:  
                 pick_index = np.random.randint(0, file_list_val_len - 1)
                 file_list_full_split = [m for m in file_list_val_full[pick_index].split()]
                 lexicon = linecache.getline(lexicon_dic_path, int(file_list_full_split[1]) + 1).strip("\n")
                 img_path = img_folder + file_list_full_split[0][1:]
                 img = cv2.imread(img_path)
+                # abandon the lexicon which is longer than 16 characters, because I set the label_len = 16, you can change it anyway.
+                # some dataset images may be damaged during unzip
                 if (img is not None) and len(lexicon) <= label_len:
                     img_size = img.shape  # (height, width, channels)
                     if img_size[1] > 2 and img_size[0] > 2:
