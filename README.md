@@ -3,6 +3,8 @@ implement CRNN in Keras with Spatial Transformer Network (STN) for Optical Chara
 
 
 The model is easy to start a trainning, but the performance of recognition is not better than the original CRNN without STN.
+I have tried to put STN part in the front of the network, between batchnorm_1 and conv_2, than the network didn't converge at all. Maybe I used STN in a wrong way?
+
 
 You can run CRNN individually by just remove the STN components, and connect *batchnorm_7* to *x_shape*. The CRNN can reach 90% of recognition accuracy.
 
