@@ -25,3 +25,7 @@ Max Jaderberg, Karen Simonyan,Andrew Zisserman and Koray Kavukcuoglu. ***"Spatia
 
 ## 2019.03.13 UPDATE
 I have tried to put STN part in the front of the network, between batchnorm_1 and conv_2, than the network didn't converge at all. Maybe I used STN in a wrong way?
+
+## 2019.05.31 UPDATE
+#### You can download trained weights [HERE](https://drive.google.com/file/d/13rcnDxRiDBDKgg-1mwikdc7F1SYG1y-g/view?usp=sharing
+https://drive.google.com/file/d/1n1Vlsz77SBh_b2cviC464ECrRhD-GSVr/view?usp=sharing)
