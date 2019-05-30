@@ -28,3 +28,5 @@ I have tried to put STN part in the front of the network, between batchnorm_1 an
 
 ## Weights Download, 2019.05.31 UPDATE
 #### You can download trained weights [CRNN_without_STN](https://drive.google.com/file/d/13rcnDxRiDBDKgg-1mwikdc7F1SYG1y-g/view?usp=sharing), and [CRNN_with_STN](https://drive.google.com/file/d/1n1Vlsz77SBh_b2cviC464ECrRhD-GSVr/view?usp=sharing). (Google Drive)
+
+#### If you can't access google, here is the Baidu Netdisk [share link](https://pan.baidu.com/s/1vHOC5Ba9mYk4lEkHRMbd5A), with password "89vw".
